@@ -6,8 +6,8 @@ import { GameOverScene } from './scenes/GameOverScene.ts';
 
 export const GameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 450,
+  width: 1000,
+  height: 600,
   parent: 'game-container',
   backgroundColor: '#110e1b',
   physics: {
