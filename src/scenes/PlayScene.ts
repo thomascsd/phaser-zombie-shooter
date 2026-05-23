@@ -1,0 +1,591 @@
+import Phaser from 'phaser';
+import { Player, type Weapon } from '../entities/Player.ts';
+import { Zombie } from '../entities/Zombie.ts';
+import { Boss } from '../entities/Boss.ts';
+import { Bullet, BossBullet } from '../entities/Bullet.ts';
+import { LevelManager } from '../utils/LevelManager.ts';
+
+export class PlayScene extends Phaser.Scene {
+  // Game Entities
+  public player!: Player;
+  public zombies!: Phaser.Physics.Arcade.Group;
+  public bullets!: Phaser.Physics.Arcade.Group;
+  public bossBullets!: Phaser.Physics.Arcade.Group;
+  public activeBoss: Boss | null = null;
+
+  // Environment
+  private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private crosshair!: Phaser.GameObjects.Sprite;
+
+  // Managers
+  private levelManager!: LevelManager;
+  private spawnTimerEvent: Phaser.Time.TimerEvent | null = null;
+
+  // HUD elements (ScrollFactor = 0)
+  private hudHealthBar!: Phaser.GameObjects.Graphics;
+  private hudHealthText!: Phaser.GameObjects.Text;
+  private hudWeaponIconBg!: Phaser.GameObjects.Graphics;
+  private hudWeaponText!: Phaser.GameObjects.Text;
+  private hudAmmoText!: Phaser.GameObjects.Text;
+  private hudReloadBar!: Phaser.GameObjects.Graphics;
+  private hudLevelText!: Phaser.GameObjects.Text;
+  private hudKillsText!: Phaser.GameObjects.Text;
+  private hudProgressText!: Phaser.GameObjects.Text;
+
+  // Boss HUD elements
+  private hudBossContainer!: Phaser.GameObjects.Container;
+  private hudBossBar!: Phaser.GameObjects.Graphics;
+  private hudBossNameText!: Phaser.GameObjects.Text;
+
+  // Alerts
+  private overlayAlertText!: Phaser.GameObjects.Text;
+
+  constructor() {
+    super('PlayScene');
+  }
+
+  public create(): void {
+    // 1. Reset managers
+    this.levelManager = new LevelManager();
+    this.levelManager.reset();
+    this.activeBoss = null;
+
+    // 2. Set physics bounds
+    // World is 2400px wide, 450px high (scrolling side-scroller)
+    this.physics.world.setBounds(0, 0, 2400, 450);
+
+    // 3. Create level map / platforms
+    this.createWorldLayout();
+
+    // 4. Create Player
+    // Spawn player at start (x=100, y=300)
+    this.player = new Player(this, 100, 300);
+
+    // 5. Physics Groups
+    this.bullets = this.physics.add.group({
+      classType: Bullet,
+      maxSize: 60,
+      runChildUpdate: true
+    });
+
+    this.bossBullets = this.physics.add.group({
+      classType: BossBullet,
+      maxSize: 80,
+      runChildUpdate: true
+    });
+
+    this.zombies = this.physics.add.group({
+      classType: Zombie,
+      runChildUpdate: true
+    });
+
+    // 6. Physics Colliders
+    // Player and ground
+    this.physics.add.collider(this.player, this.platforms);
+    // Zombies and ground
+    this.physics.add.collider(this.zombies, this.platforms);
+    // Boss and ground
+    this.physics.add.collider(this.zombies, this.platforms); // standard check, wait: boss collider added dynamically in spawn
+
+    // Bullet hit Zombie collider
+    this.physics.add.overlap(this.bullets, this.zombies, this.handleBulletHitZombie, undefined, this);
+
+    // Zombie hit Player collider
+    this.physics.add.overlap(this.player, this.zombies, this.handleZombieHitPlayer, undefined, this);
+
+    // Boss Bullet hit Player collider
+    this.physics.add.overlap(this.player, this.bossBullets, this.handleBossBulletHitPlayer, undefined, this);
+
+    // 7. Camera settings
+    this.cameras.main.setBounds(0, 0, 2400, 450);
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    this.cameras.main.setBackgroundColor('#110e1b'); // Dark neon tint
+
+    // 8. Custom Crosshair
+    this.crosshair = this.add.sprite(this.input.x, this.input.y, 'ui_crosshair');
+    this.crosshair.setDepth(100);
+
+    // 9. Init HUD & Listeners
+    this.createHUD();
+    this.setupEventListeners();
+
+    // 10. Start Level Spawning
+    this.startLevelSpawning();
+
+    // 11. Large welcome alert
+    this.showAlert('STAGE 1: ZOMBIE WASTELAND', '#3bf1a9');
+  }
+
+  public update(time: number, delta: number): void {
+    // 1. Update entities
+    this.player.update(time, delta);
+
+    if (this.activeBoss && this.activeBoss.active) {
+      this.activeBoss.updateBoss(this.player, time, delta);
+    }
+
+    this.zombies.getChildren().forEach((zombie) => {
+      (zombie as Zombie).updateZombie(this.player, delta);
+    });
+
+    // 2. Update crosshair position in world coordinates
+    this.crosshair.x = this.input.activePointer.x + this.cameras.main.scrollX;
+    this.crosshair.y = this.input.activePointer.y + this.cameras.main.scrollY;
+
+    // 3. Update HUD values
+    this.updateHUDDrawing();
+  }
+
+  private createWorldLayout(): void {
+    this.platforms = this.physics.add.staticGroup();
+
+    // Bottom solid ground (thickness: 32px, y: 418 to 450)
+    // We tile 75 blocks of 32px to cover 2400px width
+    for (let x = 16; x < 2400; x += 32) {
+      this.platforms.create(x, 434, 'ground');
+    }
+
+    // Place floating platforms (made of brick)
+    // Platform 1 (x: 300 to 524, y: 300)
+    for (let x = 320; x <= 512; x += 32) {
+      this.platforms.create(x, 310, 'brick');
+    }
+
+    // Platform 2 (x: 700 to 1020, y: 220)
+    for (let x = 720; x <= 1008; x += 32) {
+      this.platforms.create(x, 230, 'brick');
+    }
+
+    // Platform 3 (x: 1200 to 1520, y: 300)
+    for (let x = 1220; x <= 1508; x += 32) {
+      this.platforms.create(x, 310, 'brick');
+    }
+
+    // Platform 4 (x: 1700 to 1924, y: 220)
+    for (let x = 1720; x <= 1912; x += 32) {
+      this.platforms.create(x, 230, 'brick');
+    }
+
+    // Platform 5 (x: 2050 to 2274, y: 300)
+    for (let x = 2070; x <= 2262; x += 32) {
+      this.platforms.create(x, 310, 'brick');
+    }
+
+    // Border bounds invisible walls
+    // left wall
+    const lw = this.add.rectangle(-10, 225, 20, 450);
+    this.physics.add.existing(lw, true);
+    this.platforms.add(lw);
+
+    // right wall
+    const rw = this.add.rectangle(2410, 225, 20, 450);
+    this.physics.add.existing(rw, true);
+    this.platforms.add(rw);
+  }
+
+  private startLevelSpawning(): void {
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.destroy();
+    }
+
+    const config = this.levelManager.currentLevel;
+
+    // Set up recurring spawns
+    this.spawnTimerEvent = this.time.addEvent({
+      delay: config.spawnInterval,
+      callback: this.spawnZombieWave,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  private spawnZombieWave(): void {
+    // Do not spawn minions if boss is spawned in Level 2 mid boss or Level 5 final boss, 
+    // unless they are spawned by the boss itself. Wait! Spawning standard adds is fine 
+    // but we want to limit the active count.
+    if (this.zombies.getLength() >= 12) return;
+
+    const config = this.levelManager.currentLevel;
+
+    // For level 5, boss spawns immediately. LevelManager controls progression.
+    if (config.hasFinalBoss && !this.activeBoss) {
+      this.spawnBossEntity('final');
+      return;
+    }
+
+    // If mid boss is active, do not spawn waves
+    if (this.levelManager.isBossActive && this.activeBoss) {
+      return;
+    }
+
+    // If level 2 and kills reached target, spawn mid boss instead of normal wave
+    if (config.hasMidBoss && this.levelManager.killsCount >= config.targetKills && !this.levelManager.isBossSpawned) {
+      this.spawnBossEntity('mid');
+      return;
+    }
+
+    // Determine spawn position (always off-screen relative to player, but within world bounds)
+    const side = Math.random() < 0.5 ? -1 : 1;
+    let spawnX = this.player.x + side * (450 + Math.random() * 150);
+    spawnX = Phaser.Math.Clamp(spawnX, 50, 2350);
+
+    const type = this.levelManager.getNextSpawnType();
+    const zombie = new Zombie(this, spawnX, 350, type);
+    this.zombies.add(zombie);
+  }
+
+  private spawnBossEntity(type: 'mid' | 'final'): void {
+    this.levelManager.isBossActive = true;
+    this.levelManager.isBossSpawned = true;
+
+    // Clear normal spawning loop briefly to focus on Boss setup
+    if (this.spawnTimerEvent) {
+      this.spawnTimerEvent.destroy();
+    }
+
+    // Spawn coordinate
+    const spawnX = Math.min(this.player.x + 350, 2300);
+    this.activeBoss = new Boss(this, spawnX, 300, type);
+
+    // Boss collides with ground
+    this.physics.add.collider(this.activeBoss, this.platforms);
+    // Boss collides with player bullet
+    this.physics.add.overlap(this.bullets, this.activeBoss, this.handleBulletHitBoss, undefined, this);
+    // Boss overlaps player directly
+    this.physics.add.overlap(this.player, this.activeBoss, this.handleBossHitPlayer, undefined, this);
+
+    // Show Alert Banner
+    const bossName = type === 'mid' ? 'MUTANT SLEDGE (MID-BOSS)' : 'ABOMINATION CRUCIBLE (FINAL BOSS)';
+    this.showAlert(`WARNING: ${bossName} ENCOUNTER!`, '#ff3b3b');
+    this.cameras.main.flash(800, 180, 0, 0);
+
+    // Activate Boss HP HUD
+    this.hudBossContainer.setVisible(true);
+    this.hudBossNameText.setText(bossName);
+    this.updateBossHealthHUD(this.activeBoss.health, this.activeBoss.maxHealth);
+
+    // Re-enable minion spawns at a slower interval if final boss
+    if (type === 'final') {
+      this.spawnTimerEvent = this.time.addEvent({
+        delay: 5000,
+        callback: this.spawnZombieWave,
+        callbackScope: this,
+        loop: true
+      });
+    }
+  }
+
+  private handleBulletHitZombie(bulletRef: any, zombieRef: any): void {
+    const bullet = bulletRef as Bullet;
+    const zombie = zombieRef as Zombie;
+
+    // Bullet damage logic
+    const isDead = zombie.takeDamage(bullet.damage);
+    bullet.destroyBullet();
+
+    if (isDead) {
+      // Score will update and register
+    }
+  }
+
+  private handleBulletHitBoss(bulletRef: any, bossRef: any): void {
+    const bullet = bulletRef as Bullet;
+    const boss = bossRef as Boss;
+
+    boss.takeDamage(bullet.damage);
+    bullet.destroyBullet();
+  }
+
+  private handleZombieHitPlayer(_playerRef: any, zombieRef: any): void {
+    const zombie = zombieRef as Zombie;
+    this.player.takeDamage(zombie.damageValue);
+  }
+
+  private handleBossHitPlayer(_playerRef: any, bossRef: any): void {
+    const boss = bossRef as Boss;
+    this.player.takeDamage(boss.collisionDamage);
+  }
+
+  private handleBossBulletHitPlayer(_playerRef: any, bulletRef: any): void {
+    const bullet = bulletRef as BossBullet;
+    this.player.takeDamage(bullet.damage);
+    bullet.destroy();
+  }
+
+  private setupEventListeners(): void {
+    // Listen to zombie death events
+    this.events.on('zombie-killed', (zombie: Zombie) => {
+      // Small chance to drop heal item
+      if (Math.random() < 0.15) {
+        this.spawnHealPack(zombie.x, zombie.y);
+      }
+
+      // Check if boss spawned or advance wave
+      const spawnedBoss = this.levelManager.registerKill();
+      if (spawnedBoss) {
+        this.spawnBossEntity('mid');
+      }
+    });
+
+    // Listen to boss death events
+    this.events.on('boss-killed', (boss: Boss) => {
+      this.hudBossContainer.setVisible(false);
+
+      if (boss.bossType === 'mid') {
+        this.levelManager.advanceLevel();
+        this.showAlert('LEVEL 2 COMPLETE: MID-BOSS SLAIN!', '#3bf1a9');
+        this.startLevelSpawning();
+      } else {
+        // Final boss defeated -> VICTORY
+        this.time.delayedCall(1500, () => {
+          this.scene.start('GameOverScene', {
+            isVictory: true,
+            score: this.levelManager.totalKillsCount * 100,
+            kills: this.levelManager.totalKillsCount,
+            level: 5
+          });
+        });
+      }
+    });
+
+    // Listen to boss HP updates
+    this.events.on('boss-health-changed', (data: { current: number; max: number }) => {
+      this.updateBossHealthHUD(data.current, data.max);
+    });
+
+    // Listen to player death
+    this.events.on('player-died', () => {
+      this.cameras.main.fade(800, 0, 0, 0, false, (_camera: any, progress: number) => {
+        if (progress === 1) {
+          this.scene.start('GameOverScene', {
+            isVictory: false,
+            score: this.levelManager.totalKillsCount * 100,
+            kills: this.levelManager.totalKillsCount,
+            level: this.levelManager.currentLevel.levelNumber
+          });
+        }
+      });
+    });
+
+    this.events.on('weapon-changed', (weapon: Weapon) => {
+      this.showAlert(`WEAPON: ${weapon.name.toUpperCase()}`, '#aa3bff');
+    });
+  }
+
+  private spawnHealPack(x: number, y: number): void {
+    // Draw a small healing pack sprite using a rectangle & cross
+    const pack = this.add.container(x, y);
+    const bg = this.add.rectangle(0, 0, 14, 14, 0xe5e4e7);
+    const c1 = this.add.rectangle(0, 0, 10, 3, 0xff3b3b);
+    const c2 = this.add.rectangle(0, 0, 3, 10, 0xff3b3b);
+    pack.add([bg, c1, c2]);
+
+    this.physics.add.existing(pack);
+    const body = pack.body as Phaser.Physics.Arcade.Body;
+    if (body) {
+      body.setAllowGravity(true);
+      this.physics.add.collider(pack, this.platforms);
+
+      // Bounce effect
+      body.setBounce(0.3);
+      body.setVelocityY(-150);
+
+      // Player overlaps to pick up
+      this.physics.add.overlap(this.player, pack, () => {
+        if (this.player.health < this.player.maxHealth) {
+          this.player.heal(25);
+          
+          // Spawn little green plus sparkles
+          const particles = this.add.particles(pack.x, pack.y, 'particle_spark', {
+            speed: { min: 20, max: 80 },
+            scale: { start: 1, end: 0 },
+            tint: 0x3bf1a9,
+            lifespan: 400,
+            quantity: 8,
+            maxParticles: 8
+          });
+          this.time.delayedCall(500, () => particles.destroy());
+
+          pack.destroy();
+        }
+      });
+    }
+  }
+
+  private createHUD(): void {
+    // Use container styled coordinates
+    const hudContainer = this.add.container(0, 0);
+    hudContainer.setScrollFactor(0); // STATIC position relative to camera!
+    hudContainer.setDepth(90);
+
+    // 1. Health Panel
+    const heartIcon = this.add.sprite(24, 24, 'ui_heart');
+    heartIcon.setScale(1.5);
+    hudContainer.add(heartIcon);
+
+    this.hudHealthBar = this.add.graphics();
+    hudContainer.add(this.hudHealthBar);
+
+    this.hudHealthText = this.add.text(190, 16, '100/100', {
+      font: '10px "Press Start 2P"',
+      color: '#e5e4e7'
+    });
+    hudContainer.add(this.hudHealthText);
+
+    // 2. Weapon Panel
+    this.hudWeaponIconBg = this.add.graphics();
+    hudContainer.add(this.hudWeaponIconBg);
+
+    this.hudWeaponText = this.add.text(20, 60, 'PISTOL', {
+      font: '12px "Press Start 2P"',
+      color: '#3bf1a9'
+    });
+    hudContainer.add(this.hudWeaponText);
+
+    this.hudAmmoText = this.add.text(20, 78, 'AMMO: INFINITY', {
+      font: '10px "Press Start 2P"',
+      color: '#e5e4e7'
+    });
+    hudContainer.add(this.hudAmmoText);
+
+    this.hudReloadBar = this.add.graphics();
+    hudContainer.add(this.hudReloadBar);
+
+    // 3. Game Progression Panel
+    this.hudLevelText = this.add.text(640, 16, 'STAGE: 1/5', {
+      font: '10px "Press Start 2P"',
+      color: '#aa3bff'
+    });
+    hudContainer.add(this.hudLevelText);
+
+    this.hudKillsText = this.add.text(640, 32, 'KILLS: 0/15', {
+      font: '10px "Press Start 2P"',
+      color: '#e5e4e7'
+    });
+    hudContainer.add(this.hudKillsText);
+
+    this.hudProgressText = this.add.text(640, 48, 'PROGRESS: 0%', {
+      font: '8px "Press Start 2P"',
+      color: '#8b80a5'
+    });
+    hudContainer.add(this.hudProgressText);
+
+    // 4. Boss Health Overlay Container (Hidden initially)
+    this.hudBossContainer = this.add.container(0, 0);
+    this.hudBossContainer.setScrollFactor(0);
+    this.hudBossContainer.setDepth(95);
+    this.hudBossContainer.setVisible(false);
+
+    this.hudBossBar = this.add.graphics();
+    this.hudBossContainer.add(this.hudBossBar);
+
+    this.hudBossNameText = this.add.text(400, 16, 'MUTANT CHARGER (BOSS)', {
+      font: '10px "Press Start 2P"',
+      color: '#ff3b3b'
+    }).setOrigin(0.5);
+    this.hudBossContainer.add(this.hudBossNameText);
+
+    // 5. Overlay alert banner text
+    this.overlayAlertText = this.add.text(400, 200, '', {
+      font: '14px "Press Start 2P"',
+      color: '#3bf1a9',
+      align: 'center'
+    }).setOrigin(0.5).setVisible(false);
+    this.overlayAlertText.setScrollFactor(0);
+    this.overlayAlertText.setDepth(100);
+  }
+
+  private updateHUDDrawing(): void {
+    const config = this.levelManager.currentLevel;
+
+    // Draw Health bar (green neon)
+    this.hudHealthBar.clear();
+    this.hudHealthBar.fillStyle(0x1a1625, 0.8); // dark background
+    this.hudHealthBar.fillRect(45, 15, 130, 16);
+
+    const hpPercent = Phaser.Math.Clamp(this.player.health / this.player.maxHealth, 0, 1);
+    const hpColor = hpPercent > 0.4 ? 0x3bf1a9 : 0xff3b3b;
+    this.hudHealthBar.fillStyle(hpColor, 1);
+    this.hudHealthBar.fillRect(47, 17, 126 * hpPercent, 12);
+
+    this.hudHealthText.setText(`${Math.ceil(this.player.health)}/${this.player.maxHealth}`);
+
+    // Update weapon panel
+    const weapon = this.player.currentWeapon;
+    this.hudWeaponText.setText(weapon.name.toUpperCase());
+    
+    if (weapon.clipSize === Infinity) {
+      this.hudAmmoText.setText('AMMO: INFINITE');
+    } else {
+      this.hudAmmoText.setText(`AMMO: ${weapon.currentAmmo}/${weapon.clipSize}`);
+    }
+
+    // Draw reload progress bar above weapon text
+    this.hudReloadBar.clear();
+    if (this.player.isReloading) {
+      this.hudReloadBar.fillStyle(0x1a1625, 0.8);
+      this.hudReloadBar.fillRect(20, 95, 100, 6);
+      this.hudReloadBar.fillStyle(0xaa3bff, 1);
+      this.hudReloadBar.fillRect(22, 97, 96 * this.player.reloadProgress, 2);
+    }
+
+    // Draw progression HUD
+    this.hudLevelText.setText(`STAGE: ${config.levelNumber}/5`);
+    
+    if (config.hasFinalBoss) {
+      this.hudKillsText.setText('BOSS ENCOUNTER');
+      this.hudProgressText.setText('BOSS DEFEATED: 0%');
+    } else if (config.hasMidBoss && this.levelManager.isBossSpawned) {
+      this.hudKillsText.setText('BOSS ENCOUNTER');
+      this.hudProgressText.setText('BOSS DEFEATED: 0%');
+    } else {
+      this.hudKillsText.setText(`KILLS: ${this.levelManager.killsCount}/${config.targetKills}`);
+      const prog = Math.min(Math.floor((this.levelManager.killsCount / config.targetKills) * 100), 100);
+      this.hudProgressText.setText(`PROGRESS: ${prog}%`);
+    }
+
+    // If level manager shows that level index doesn't match the current rendered stage HUD
+    // (Checked automatically during progression advance)
+  }
+
+  private updateBossHealthHUD(current: number, max: number): void {
+    this.hudBossBar.clear();
+    
+    // Boss frame border
+    this.hudBossBar.fillStyle(0x1a1625, 0.8);
+    this.hudBossBar.fillRect(200, 28, 400, 16);
+
+    // red filler
+    const hpPercent = Phaser.Math.Clamp(current / max, 0, 1);
+    this.hudBossBar.fillStyle(0xff3b3b, 1);
+    this.hudBossBar.fillRect(202, 30, 396 * hpPercent, 12);
+  }
+
+  private showAlert(message: string, colorHexStr: string): void {
+    this.overlayAlertText.setText(message);
+    this.overlayAlertText.setColor(colorHexStr);
+    this.overlayAlertText.setVisible(true);
+    this.overlayAlertText.setAlpha(1);
+
+    // Pulsate text
+    this.tweens.add({
+      targets: this.overlayAlertText,
+      scale: 1.1,
+      duration: 250,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => {
+        // fade away
+        this.tweens.add({
+          targets: this.overlayAlertText,
+          alpha: 0,
+          duration: 1000,
+          delay: 500,
+          onComplete: () => {
+            this.overlayAlertText.setVisible(false);
+          }
+        });
+      }
+    });
+  }
+}

@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;700&display=swap');
+
+:root {
+  --bg-color: #0c0a0f;
+  --panel-bg: #1a1625;
+  --text-color: #e5e4e7;
+  --primary-color: #3bf1a9; /* retro neon green */
+  --accent-color: #aa3bff; /* purple */
+  --danger-color: #ff3b3b; /* red */
+  --shadow-color: rgba(0, 0, 0, 0.7);
+  --border-color: #352e47;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  image-rendering: pixelated; /* Make canvas render pixelated */
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 900px;
+  padding: 20px;
+}
+
+h1.game-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 24px;
+  color: var(--primary-color);
+  text-shadow: 4px 4px 0px var(--accent-color);
+  margin-bottom: 20px;
+  text-align: center;
+  letter-spacing: 2px;
+  animation: pulse 1.5s infinite alternate;
+}
+
+.game-container {
+  position: relative;
+  background-color: #000;
+  border: 4px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 20px 40px var(--shadow-color), 0 0 20px rgba(170, 59, 255, 0.2);
+  width: 800px;
+  height: 450px;
+  overflow: hidden;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.instructions {
+  margin-top: 20px;
+  font-family: 'Outfit', sans-serif;
+  color: #8b80a5;
+  text-align: center;
+  max-width: 600px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.instructions-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  color: var(--accent-color);
+  margin-bottom: 8px;
+}
+
+.instructions span {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(59, 241, 169, 0.4));
+  }
+  100% {
+    transform: scale(1.02);
+    filter: drop-shadow(0 0 10px rgba(59, 241, 169, 0.8));
+  }
+}
+
+/* Hide cursor when over the game canvas since we render a custom crosshair */
+.game-container canvas {
+  cursor: none !important;
+}
