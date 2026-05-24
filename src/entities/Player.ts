@@ -45,6 +45,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     ONE: Phaser.Input.Keyboard.Key;
     TWO: Phaser.Input.Keyboard.Key;
     THREE: Phaser.Input.Keyboard.Key;
+    R: Phaser.Input.Keyboard.Key;
   };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -70,7 +71,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         SPACE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
         ONE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
         TWO: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-        THREE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
+        THREE: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+        R: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R)
       };
     }
 
@@ -127,7 +129,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   public update(time: number, delta: number): void {
     if (this.health <= 0) {
-      this.setVelocityX(0);
+      this.setVelocity(0, 0);
       return;
     }
 
@@ -168,44 +170,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const pointer = this.scene.input.activePointer;
     // Calculate world mouse position since we scroll screen
     const worldMouseX = pointer.x + this.scene.cameras.main.scrollX;
+    const worldMouseY = pointer.y + this.scene.cameras.main.scrollY;
     const isMouseRight = worldMouseX >= this.x;
 
     this.flipX = !isMouseRight;
 
-    // Movement (WASD)
+    // Movement (WASD) - 8-directional movement
     let moveSpeed = this.speed;
     // Slow down slightly if reloading or firing a heavy weapon
     if (this.isReloading) {
       moveSpeed *= 0.7;
     }
 
-    if (this.keys.A.isDown) {
-      this.setVelocityX(-moveSpeed);
-      if (body.blocked.down || body.touching.down) {
-        this.play('player-walk', true);
-      }
-    } else if (this.keys.D.isDown) {
-      this.setVelocityX(moveSpeed);
-      if (body.blocked.down || body.touching.down) {
-        this.play('player-walk', true);
-      }
+    let vx = 0;
+    let vy = 0;
+    if (this.keys.A.isDown) vx = -1;
+    else if (this.keys.D.isDown) vx = 1;
+
+    if (this.keys.W.isDown) vy = -1;
+    else if (this.keys.S.isDown) vy = 1;
+
+    if (vx !== 0 && vy !== 0) {
+      vx *= Math.SQRT1_2;
+      vy *= Math.SQRT1_2;
+    }
+
+    this.setVelocity(vx * moveSpeed, vy * moveSpeed);
+
+    if (vx !== 0 || vy !== 0) {
+      this.play('player-walk', true);
     } else {
-      this.setVelocityX(0);
-      if (body.blocked.down || body.touching.down) {
-        this.play('player-idle', true);
-      }
-    }
-
-    // Jumping (W or Space)
-    const isJumpPressed = this.keys.W.isDown || this.keys.SPACE.isDown;
-    if (isJumpPressed && (body.blocked.down || body.touching.down)) {
-      this.setVelocityY(this.jumpForce);
-      this.play('player-jump', true);
-    }
-
-    // If in mid-air, keep jump animation
-    if (!body.blocked.down && !body.touching.down) {
-      this.play('player-jump', true);
+      this.play('player-idle', true);
     }
 
     // Handle Shooting
@@ -218,14 +213,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (isMouseDown && !this.isReloading) {
       if (weapon.isAutomatic || isJustClicked) {
         if (time - this.lastFiredTime >= weapon.cooldown) {
-          this.shoot(worldMouseX, pointer.y + this.scene.cameras.main.scrollY, time);
+          this.shoot(worldMouseX, worldMouseY, time);
         }
       }
     }
 
-    // Manual reload (press R)? Yes, we can add Key R!
-    const keyR = this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.R);
-    if (keyR && Phaser.Input.Keyboard.JustDown(keyR) && !this.isReloading && weapon.clipSize !== Infinity) {
+    // Manual reload (press R)
+    if (Phaser.Input.Keyboard.JustDown(this.keys.R) && !this.isReloading && weapon.clipSize !== Infinity) {
       if (weapon.currentAmmo < weapon.clipSize) {
         this.startReload();
       }

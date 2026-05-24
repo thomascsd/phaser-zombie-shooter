@@ -13,6 +13,11 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
 
   private isHurt: boolean = false;
   private hurtTimer: number = 0;
+  private isDashing: boolean = false;
+  private dashCooldownTimer: number = 0;
+  private dashActiveTimer: number = 0;
+  private dashVelocityX: number = 0;
+  private dashVelocityY: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, type: ZombieType) {
     // Determine texture based on type
@@ -69,41 +74,68 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
   public updateZombie(player: Player, delta: number): void {
     if (this.health <= 0 || !this.active) return;
 
-    // Handle damage flash cooldown
+    // Handle damage flash cooldown and knockback state
     if (this.isHurt) {
       this.hurtTimer -= delta;
       if (this.hurtTimer <= 0) {
         this.isHurt = false;
         this.setTint(0xffffff);
       }
+      return; // Skip AI pathfinding while knocked back
     }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (!body) return;
 
-    // AI logic: Walk towards player
-    const direction = player.x - this.x;
-    const absDir = Math.abs(direction);
-
-    // Turn sprite to face player
-    if (direction > 0) {
-      this.flipX = false;
-      this.setVelocityX(this.speed);
-    } else {
-      this.flipX = true;
-      this.setVelocityX(-this.speed);
-    }
-
-    // Special jump logic for fast zombie to leap over obstacles or just jump towards player
-    if (this.zombieType === 'fast' && (body.blocked.down || body.touching.down)) {
-      // Leap if player is higher up or randomly to create chaotic behavior
-      const isPlayerHigher = player.y < this.y - 40;
-      if (isPlayerHigher && absDir < 150 && Math.random() < 0.02) {
-        this.setVelocityY(-250);
+    // Dash timers for Fast Zombies
+    if (this.zombieType === 'fast') {
+      if (this.isDashing) {
+        this.dashActiveTimer -= delta;
+        if (this.dashActiveTimer <= 0) {
+          this.isDashing = false;
+          this.dashCooldownTimer = 3000;
+          this.setTint(0xffffff);
+        } else {
+          this.setVelocity(this.dashVelocityX, this.dashVelocityY);
+          this.flipX = this.dashVelocityX < 0;
+          return;
+        }
+      } else if (this.dashCooldownTimer > 0) {
+        this.dashCooldownTimer -= delta;
       }
     }
 
-    // Special AI: tank zombies are resistant to knockback, normal/fast are not
+    // AI logic: Walk directly towards player
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Trigger Dash if fast zombie is close enough and off cooldown
+    if (this.zombieType === 'fast' && !this.isDashing && this.dashCooldownTimer <= 0 && distance < 200 && distance > 30) {
+      this.isDashing = true;
+      this.dashActiveTimer = 500;
+      this.setTint(0xffaa55); // Orange glow during dash
+      if (distance > 0) {
+        this.dashVelocityX = (dx / distance) * this.speed * 3.0;
+        this.dashVelocityY = (dy / distance) * this.speed * 3.0;
+      } else {
+        this.dashVelocityX = this.speed * 3.0;
+        this.dashVelocityY = 0;
+      }
+      this.setVelocity(this.dashVelocityX, this.dashVelocityY);
+      this.flipX = this.dashVelocityX < 0;
+      return;
+    }
+
+    // Normal movement
+    if (distance > 0) {
+      const vx = (dx / distance) * this.speed;
+      const vy = (dy / distance) * this.speed;
+      this.setVelocity(vx, vy);
+      this.flipX = vx < 0;
+    } else {
+      this.setVelocity(0, 0);
+    }
   }
 
   public takeDamage(amount: number): boolean {
@@ -116,13 +148,24 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     this.hurtTimer = 150;
     this.setTint(0xff5555);
 
-    // Knocback effect: bounce away from projectile impact slightly
+    // Cancel current dash if hurt
+    if (this.isDashing) {
+      this.isDashing = false;
+      this.dashCooldownTimer = 1500; // shorter cooldown on interrupt
+    }
+
+    // Knockback effect: push away from player in top-down plane
+    const playScene = this.scene as any;
+    const player = playScene.player as Player;
     const body = this.body as Phaser.Physics.Arcade.Body;
-    if (body) {
-      const knockbackFactor = this.zombieType === 'tank' ? -20 : -80;
-      // knock back in opposite direction of current horizontal movement
-      const dirX = body.velocity.x > 0 ? 1 : -1;
-      this.setVelocityX(dirX * knockbackFactor);
+    if (body && player) {
+      const knockbackStrength = this.zombieType === 'tank' ? 50 : 150;
+      const dx = this.x - player.x;
+      const dy = this.y - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        this.setVelocity((dx / dist) * knockbackStrength, (dy / dist) * knockbackStrength);
+      }
     }
 
     // Blood Splatter Particles

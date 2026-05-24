@@ -51,15 +51,15 @@ export class PlayScene extends Phaser.Scene {
     this.activeBoss = null;
 
     // 2. Set physics bounds
-    // World is 2400px wide, 450px high (scrolling side-scroller)
-    this.physics.world.setBounds(0, 0, 2400, 450);
+    // World is 1600px wide, 1200px high (top-down arena)
+    this.physics.world.setBounds(0, 0, 1600, 1200);
 
     // 3. Create level map / platforms
     this.createWorldLayout();
 
     // 4. Create Player
-    // Spawn player at start (x=100, y=300)
-    this.player = new Player(this, 100, 300);
+    // Spawn player at center of arena (x=800, y=600)
+    this.player = new Player(this, 800, 600);
 
     // 5. Physics Groups
     this.bullets = this.physics.add.group({
@@ -97,7 +97,7 @@ export class PlayScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.bossBullets, this.handleBossBulletHitPlayer, undefined, this);
 
     // 7. Camera settings
-    this.cameras.main.setBounds(0, 0, 2400, 450);
+    this.cameras.main.setBounds(0, 0, 1600, 1200);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setBackgroundColor('#110e1b'); // Dark neon tint
 
@@ -129,8 +129,9 @@ export class PlayScene extends Phaser.Scene {
     });
 
     // 2. Update crosshair position in world coordinates
-    this.crosshair.x = this.input.activePointer.x + this.cameras.main.scrollX;
-    this.crosshair.y = this.input.activePointer.y + this.cameras.main.scrollY;
+    const pointer = this.input.activePointer;
+    this.crosshair.x = pointer.worldX;
+    this.crosshair.y = pointer.worldY;
 
     // 3. Update HUD values
     this.updateHUDDrawing();
@@ -139,48 +140,39 @@ export class PlayScene extends Phaser.Scene {
   private createWorldLayout(): void {
     this.platforms = this.physics.add.staticGroup();
 
-    // Bottom solid ground (thickness: 32px, y: 418 to 450)
-    // We tile 75 blocks of 32px to cover 2400px width
-    for (let x = 16; x < 2400; x += 32) {
-      this.platforms.create(x, 434, 'ground');
+    // 1. Border Walls (using 'ground' texture, 32x32 blocks)
+    // Top & Bottom walls
+    for (let x = 16; x < 1600; x += 32) {
+      this.platforms.create(x, 16, 'ground');
+      this.platforms.create(x, 1184, 'ground');
+    }
+    // Left & Right walls (exclude corners)
+    for (let y = 48; y < 1180; y += 32) {
+      this.platforms.create(16, y, 'ground');
+      this.platforms.create(1584, y, 'ground');
     }
 
-    // Place floating platforms (made of brick)
-    // Platform 1 (x: 300 to 524, y: 300)
-    for (let x = 320; x <= 512; x += 32) {
-      this.platforms.create(x, 310, 'brick');
-    }
+    // Helper to create a solid rectangular block of bricks
+    const createBrickBlock = (startX: number, startY: number, cols: number, rows: number) => {
+      for (let col = 0; col < cols; col++) {
+        for (let row = 0; row < rows; row++) {
+          this.platforms.create(startX + col * 32, startY + row * 32, 'brick');
+        }
+      }
+    };
 
-    // Platform 2 (x: 700 to 1020, y: 220)
-    for (let x = 720; x <= 1008; x += 32) {
-      this.platforms.create(x, 230, 'brick');
-    }
+    // 2. Scattered Obstacles in the arena (using 'brick' texture)
+    // Pillars/structures in the quadrants (3x3 blocks)
+    createBrickBlock(352, 252, 3, 3);
+    createBrickBlock(1152, 252, 3, 3);
+    createBrickBlock(352, 852, 3, 3);
+    createBrickBlock(1152, 852, 3, 3);
 
-    // Platform 3 (x: 1200 to 1520, y: 300)
-    for (let x = 1220; x <= 1508; x += 32) {
-      this.platforms.create(x, 310, 'brick');
-    }
-
-    // Platform 4 (x: 1700 to 1924, y: 220)
-    for (let x = 1720; x <= 1912; x += 32) {
-      this.platforms.create(x, 230, 'brick');
-    }
-
-    // Platform 5 (x: 2050 to 2274, y: 300)
-    for (let x = 2070; x <= 2262; x += 32) {
-      this.platforms.create(x, 310, 'brick');
-    }
-
-    // Border bounds invisible walls
-    // left wall
-    const lw = this.add.rectangle(-10, 225, 20, 450);
-    this.physics.add.existing(lw, true);
-    this.platforms.add(lw);
-
-    // right wall
-    const rw = this.add.rectangle(2410, 225, 20, 450);
-    this.physics.add.existing(rw, true);
-    this.platforms.add(rw);
+    // Center area obstacles (leaving the absolute center 800,600 open for player spawning)
+    createBrickBlock(736, 400, 5, 1); // Top of center
+    createBrickBlock(736, 768, 5, 1); // Bottom of center
+    createBrickBlock(448, 544, 1, 4); // Left of center
+    createBrickBlock(1120, 544, 1, 4); // Right of center
   }
 
   private startLevelSpawning(): void {
@@ -224,13 +216,17 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
 
-    // Determine spawn position (always off-screen relative to player, but within world bounds)
-    const side = Math.random() < 0.5 ? -1 : 1;
-    let spawnX = this.player.x + side * (450 + Math.random() * 150);
-    spawnX = Phaser.Math.Clamp(spawnX, 50, 2350);
+    // Determine spawn position in a random circle radius around the player (off-screen)
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 400 + Math.random() * 200;
+    let spawnX = this.player.x + Math.cos(angle) * distance;
+    let spawnY = this.player.y + Math.sin(angle) * distance;
+
+    spawnX = Phaser.Math.Clamp(spawnX, 50, 1550);
+    spawnY = Phaser.Math.Clamp(spawnY, 50, 1150);
 
     const type = this.levelManager.getNextSpawnType();
-    const zombie = new Zombie(this, spawnX, 350, type);
+    const zombie = new Zombie(this, spawnX, spawnY, type);
     this.zombies.add(zombie);
   }
 
@@ -243,9 +239,16 @@ export class PlayScene extends Phaser.Scene {
       this.spawnTimerEvent.destroy();
     }
 
-    // Spawn coordinate
-    const spawnX = Math.min(this.player.x + 350, 2300);
-    this.activeBoss = new Boss(this, spawnX, 300, type);
+    // Spawn coordinate in a random direction from the player
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 400;
+    let spawnX = this.player.x + Math.cos(angle) * distance;
+    let spawnY = this.player.y + Math.sin(angle) * distance;
+
+    spawnX = Phaser.Math.Clamp(spawnX, 100, 1500);
+    spawnY = Phaser.Math.Clamp(spawnY, 100, 1100);
+
+    this.activeBoss = new Boss(this, spawnX, spawnY, type);
 
     // Boss collides with ground
     this.physics.add.collider(this.activeBoss, this.platforms);
@@ -383,12 +386,15 @@ export class PlayScene extends Phaser.Scene {
     this.physics.add.existing(pack);
     const body = pack.body as Phaser.Physics.Arcade.Body;
     if (body) {
-      body.setAllowGravity(true);
-      this.physics.add.collider(pack, this.platforms);
+      body.setAllowGravity(false);
+      
+      // Give it a tiny slide/friction effect on drop
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 100;
+      body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+      body.setDrag(200);
 
-      // Bounce effect
-      body.setBounce(0.3);
-      body.setVelocityY(-150);
+      this.physics.add.collider(pack, this.platforms);
 
       // Player overlaps to pick up
       this.physics.add.overlap(this.player, pack, () => {

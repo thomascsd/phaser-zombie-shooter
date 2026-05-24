@@ -23,6 +23,8 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   private nextSummonTime: number = 0;
   private isDashing: boolean = false;
   private dashEndTime: number = 0;
+  private dashVelocityX: number = 0;
+  private dashVelocityY: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, type: BossType) {
     const texture = type === 'mid' ? 'mid_boss' : 'final_boss';
@@ -101,20 +103,23 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         this.setTint(0xffffff);
       } else {
         // Keep moving in dash direction
-        const dir = this.flipX ? -1 : 1;
-        this.setVelocityX(dir * 300);
+        this.setVelocity(this.dashVelocityX, this.dashVelocityY);
+        this.flipX = this.dashVelocityX < 0;
         return; // Skip normal AI during dash
       }
     }
 
-    // Default Walk Behavior towards player
-    const direction = player.x - this.x;
-    if (direction > 0) {
-      this.flipX = false;
-      this.setVelocityX(this.currentSpeed);
+    // Default Walk Behavior towards player in top-down
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > 0) {
+      const vx = (dx / distance) * this.currentSpeed;
+      const vy = (dy / distance) * this.currentSpeed;
+      this.setVelocity(vx, vy);
+      this.flipX = vx < 0;
     } else {
-      this.flipX = true;
-      this.setVelocityX(-this.currentSpeed);
+      this.setVelocity(0, 0);
     }
 
     // Run attacks
@@ -122,6 +127,25 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
       this.handleMidBossAttacks(player, time);
     } else {
       this.handleFinalBossAttacks(player, time);
+    }
+  }
+
+  private startDash(player: Player, duration: number, speed: number, colorHex: number, time: number, cooldown: number): void {
+    this.isDashing = true;
+    this.dashEndTime = time + duration;
+    this.nextAttackTime = time + cooldown;
+    this.currentSpeed = speed;
+    this.setTint(colorHex);
+
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 0) {
+      this.dashVelocityX = (dx / dist) * speed;
+      this.dashVelocityY = (dy / dist) * speed;
+    } else {
+      this.dashVelocityX = speed;
+      this.dashVelocityY = 0;
     }
   }
 
@@ -157,11 +181,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
       const rand = Math.random();
       if (rand < 0.4) {
         // Dash Attack!
-        this.isDashing = true;
-        this.dashEndTime = time + 1200;
-        this.nextAttackTime = time + 6000;
-        this.currentSpeed = 300;
-        this.setTint(0xff33cc); // Pink tinted dash
+        this.startDash(player, 1200, 300, 0xff33cc, time, 6000);
       } else {
         // Shoot 3 bullets
         this.fireSpreadBullets(player, 3, 20, 180, 15);
@@ -181,11 +201,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         // Dash or fire spread
         if (Math.random() < 0.4) {
           // Dash charge
-          this.isDashing = true;
-          this.dashEndTime = time + 1500;
-          this.nextAttackTime = time + 5000;
-          this.currentSpeed = 320;
-          this.setTint(0xff3333); // Red dash
+          this.startDash(player, 1500, 320, 0xff3333, time, 5000);
         } else {
           // Fire 3-spread bullets
           this.fireSpreadBullets(player, 3, 25, 200, 20);
@@ -196,11 +212,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
         const rand = Math.random();
         if (rand < 0.3) {
           // Rapid Dash
-          this.isDashing = true;
-          this.dashEndTime = time + 1000;
-          this.nextAttackTime = time + 4000;
-          this.currentSpeed = 360;
-          this.setTint(0xff3333);
+          this.startDash(player, 1000, 360, 0xff3333, time, 4000);
         } else if (rand < 0.7) {
           // Wave Bullet Hell (5 spread)
           this.fireSpreadBullets(player, 5, 35, 220, 20);
@@ -288,18 +300,22 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     if (!zombiesGroup || !player) return;
 
     for (let i = 0; i < count; i++) {
-      // Spawn slightly off-screen or above, relative to player
-      const side = Math.random() < 0.5 ? -1 : 1;
-      // Ensure within bounds
-      let spawnX = player.x + side * (250 + Math.random() * 150);
-      spawnX = Phaser.Math.Clamp(spawnX, 50, 2350); // limit to world width
+      // Spawn in a random circle radius around player (e.g. 250px to 400px away)
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 250 + Math.random() * 150;
+      let spawnX = player.x + Math.cos(angle) * distance;
+      let spawnY = player.y + Math.sin(angle) * distance;
+
+      // Clamp to map bounds (1600x1200 with 50 margin)
+      spawnX = Phaser.Math.Clamp(spawnX, 50, 1550);
+      spawnY = Phaser.Math.Clamp(spawnY, 50, 1150);
 
       const type = types[Math.floor(Math.random() * types.length)];
-      const zombie = new Zombie(this.scene, spawnX, 300, type);
+      const zombie = new Zombie(this.scene, spawnX, spawnY, type);
       zombiesGroup.add(zombie);
 
       // Portal flash effect at spawn
-      const flash = this.scene.add.sprite(spawnX, 350, 'boss_bullet');
+      const flash = this.scene.add.sprite(spawnX, spawnY, 'boss_bullet');
       flash.setScale(2);
       this.scene.tweens.add({
         targets: flash,
