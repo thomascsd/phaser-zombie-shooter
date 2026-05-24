@@ -57,8 +57,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (body) {
       body.setCollideWorldBounds(true);
       // Shrink body bounds slightly for better collision
-      body.setSize(20, 28);
-      body.setOffset(6, 4);
+      body.setSize(40, 56);
+      body.setOffset(12, 8);
     }
 
     // Initialize inputs
@@ -272,8 +272,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Bullet origin is player center/gun point
     // Shift slightly to the front based on direction
-    const gunOffsetX = this.flipX ? -12 : 12;
-    const gunOffsetY = 4;
+    const gunOffsetX = this.flipX ? -24 : 24;
+    const gunOffsetY = 8;
     const fireX = this.x + gunOffsetX;
     const fireY = this.y + gunOffsetY;
 

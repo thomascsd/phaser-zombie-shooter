@@ -291,9 +291,9 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  private handleBulletHitBoss(bulletRef: any, bossRef: any): void {
-    const bullet = bulletRef as Bullet;
+  private handleBulletHitBoss(bossRef: any, bulletRef: any): void {
     const boss = bossRef as Boss;
+    const bullet = bulletRef as Bullet;
 
     boss.takeDamage(bullet.damage);
     bullet.destroyBullet();

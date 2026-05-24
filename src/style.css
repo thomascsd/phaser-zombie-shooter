@@ -31,21 +31,27 @@ body {
 }
 
 #app {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100vw;
   height: 100vh;
-  padding: 20px;
+  padding: 0;
 }
 
 h1.game-title {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  pointer-events: none;
   font-family: 'Press Start 2P', cursive;
   font-size: 24px;
   color: var(--primary-color);
   text-shadow: 4px 4px 0px var(--accent-color);
-  margin-bottom: 20px;
   text-align: center;
   letter-spacing: 2px;
   animation: pulse 1.5s infinite alternate;
@@ -54,11 +60,10 @@ h1.game-title {
 .game-container {
   position: relative;
   background-color: #000;
-  border: 4px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 20px 40px var(--shadow-color), 0 0 20px rgba(170, 59, 255, 0.2);
-  width: 800px;
-  height: 450px;
+  width: calc(100vh * 5 / 3);
+  height: 100vh;
+  max-width: 100vw;
+  max-height: calc(100vw * 3 / 5);
   overflow: hidden;
 }
 
@@ -68,11 +73,17 @@ h1.game-title {
 }
 
 .instructions {
-  margin-top: 20px;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  z-index: 10;
+  pointer-events: none;
   font-family: 'Outfit', sans-serif;
   color: #8b80a5;
   text-align: center;
-  max-width: 600px;
   font-size: 14px;
   line-height: 1.6;
 }

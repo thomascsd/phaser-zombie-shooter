@@ -115,14 +115,14 @@ export class AssetGenerator {
 
   private static createPlayerSpritesheet(scene: Phaser.Scene): void {
     const key = 'player';
-    const frameWidth = 32;
-    const frameHeight = 32;
+    const frameWidth = 64;
+    const frameHeight = 64;
     const numFrames = 4;
     const canvas = scene.textures.createCanvas(key, frameWidth * numFrames, frameHeight);
     if (!canvas) return;
     const ctx = canvas.getContext();
 
-    const scale = 2; // 16x16 virtual pixels inside 32x32 canvas
+    const scale = 4; // 16x16 virtual pixels inside 64x64 canvas
 
     // Palettes
     const helmet = '#3e613c'; // Dark green
@@ -260,14 +260,14 @@ export class AssetGenerator {
 
   private static createZombieNormalSpritesheet(scene: Phaser.Scene): void {
     const key = 'zombie_normal';
-    const frameWidth = 32;
-    const frameHeight = 32;
+    const frameWidth = 64;
+    const frameHeight = 64;
     const numFrames = 3;
     const canvas = scene.textures.createCanvas(key, frameWidth * numFrames, frameHeight);
     if (!canvas) return;
     const ctx = canvas.getContext();
 
-    const scale = 2;
+    const scale = 4;
     // Normal Zombie colors
     const skin = '#4d8c58'; // Green
     const clothes = '#3c354a'; // Tattered purple
@@ -286,14 +286,14 @@ export class AssetGenerator {
 
   private static createZombieFastSpritesheet(scene: Phaser.Scene): void {
     const key = 'zombie_fast';
-    const frameWidth = 32;
-    const frameHeight = 32;
+    const frameWidth = 64;
+    const frameHeight = 64;
     const numFrames = 3;
     const canvas = scene.textures.createCanvas(key, frameWidth * numFrames, frameHeight);
     if (!canvas) return;
     const ctx = canvas.getContext();
 
-    const scale = 2;
+    const scale = 4;
     // Fast zombie colors (reddish, angry)
     const skin = '#8c3d3d'; // Crimson
     const clothes = '#a68b44'; // Dirty yellow
@@ -384,14 +384,14 @@ export class AssetGenerator {
 
   private static createZombieTankSpritesheet(scene: Phaser.Scene): void {
     const key = 'zombie_tank';
-    const frameWidth = 48;
-    const frameHeight = 48;
+    const frameWidth = 64;
+    const frameHeight = 64;
     const numFrames = 3;
     const canvas = scene.textures.createCanvas(key, frameWidth * numFrames, frameHeight);
     if (!canvas) return;
     const ctx = canvas.getContext();
 
-    const scale = 2; // 24x24 pixels inside 48x48 canvas
+    const scale = 64 / 24; // 24x24 pixels inside 64x64 canvas
 
     const skin = '#52695c'; // Dull grey-green skin
     const clothes = '#54463d'; // Tattered brown

@@ -58,13 +58,8 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.setCollideWorldBounds(true);
-      if (type === 'tank') {
-        body.setSize(30, 42);
-        body.setOffset(9, 6);
-      } else {
-        body.setSize(20, 28);
-        body.setOffset(6, 4);
-      }
+      body.setSize(40, 56);
+      body.setOffset(12, 8);
     }
 
     // Play default walking animation
