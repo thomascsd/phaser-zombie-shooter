@@ -15,32 +15,32 @@ export class LevelManager {
   private static levels: LevelConfig[] = [
     {
       levelNumber: 1,
-      targetKills: 15,
-      spawnInterval: 3000,
-      spawnComposition: { normal: 1.0, fast: 0.0, tank: 0.0 },
+      targetKills: 12,
+      spawnInterval: 1000,
+      spawnComposition: { normal: 0.7, fast: 0.3, tank: 0.0 },
       hasMidBoss: false,
       hasFinalBoss: false
     },
     {
       levelNumber: 2,
       targetKills: 20, // After 20 normal kills, mid boss spawns
-      spawnInterval: 2500,
-      spawnComposition: { normal: 1.0, fast: 0.0, tank: 0.0 },
+      spawnInterval: 800,
+      spawnComposition: { normal: 0.4, fast: 0.4, tank: 0.2 },
       hasMidBoss: true,
       hasFinalBoss: false
     },
     {
       levelNumber: 3,
       targetKills: 25,
-      spawnInterval: 2000,
-      spawnComposition: { normal: 0.6, fast: 0.4, tank: 0.0 },
+      spawnInterval: 500,
+      spawnComposition: { normal: 0.3, fast: 0.4, tank: 0.3 },
       hasMidBoss: false,
       hasFinalBoss: false
     },
     {
       levelNumber: 4,
       targetKills: 35,
-      spawnInterval: 1500,
+      spawnInterval: 300,
       spawnComposition: { normal: 0.4, fast: 0.4, tank: 0.2 },
       hasMidBoss: false,
       hasFinalBoss: false
