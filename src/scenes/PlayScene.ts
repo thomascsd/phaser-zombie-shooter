@@ -302,6 +302,7 @@ export class PlayScene extends Phaser.Scene {
   private handleZombieHitPlayer(_playerRef: any, zombieRef: any): void {
     const zombie = zombieRef as Zombie;
     this.player.takeDamage(zombie.damageValue);
+    zombie.playAttack();
   }
 
   private handleBossHitPlayer(_playerRef: any, bossRef: any): void {

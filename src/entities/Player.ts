@@ -49,16 +49,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'player', '0');
+    super(scene, x, y, 'player-idle-0');
     scene.add.existing(this);
     scene.physics.add.existing(this);
+
+    // Set scale for high-res spritesheet
+    this.setScale(0.16);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.setCollideWorldBounds(true);
-      // Shrink body bounds slightly for better collision
-      body.setSize(40, 56);
-      body.setOffset(12, 8);
+      // Shrink body bounds slightly for better collision based on 458x392 resolution
+      body.setSize(180, 300);
+      body.setOffset(139, 50);
     }
 
     // Initialize inputs
@@ -130,6 +133,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   public update(time: number, delta: number): void {
     if (this.health <= 0) {
       this.setVelocity(0, 0);
+      if (this.anims.currentAnim?.key !== 'player-die') {
+        this.play('player-die');
+      }
       return;
     }
 
@@ -197,7 +203,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     this.setVelocity(vx * moveSpeed, vy * moveSpeed);
 
-    if (vx !== 0 || vy !== 0) {
+    if (this.isHurt) {
+      if (this.anims.currentAnim?.key !== 'player-hurt') {
+        this.play('player-hurt', true);
+      }
+    } else if (this.anims.currentAnim?.key === 'player-shot' && this.anims.isPlaying) {
+      // Let shoot animation finish
+    } else if (vx !== 0 || vy !== 0) {
       this.play('player-walk', true);
     } else {
       this.play('player-idle', true);
@@ -269,6 +281,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Trigger gun fire sound/effect
     this.scene.events.emit('player-shot', weapon);
+    this.play('player-shot', true);
 
     // Bullet origin is player center/gun point
     // Shift slightly to the front based on direction

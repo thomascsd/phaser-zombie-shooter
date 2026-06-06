@@ -19,10 +19,13 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
   private dashVelocityX: number = 0;
   private dashVelocityY: number = 0;
 
+  // Add custom animation/tint tracking
+  private isAttacking: boolean = false;
+  private attackTimer: number = 0;
+  private baseTint: number = 0xffffff;
+
   constructor(scene: Phaser.Scene, x: number, y: number, type: ZombieType) {
-    // Determine texture based on type
-    const texture = `zombie_${type}`;
-    super(scene, x, y, texture, '0');
+    super(scene, x, y, 'zombie-walk-0');
     this.zombieType = type;
 
     // Apply specific stats based on type
@@ -33,6 +36,8 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
         this.speed = 120;
         this.damageValue = 8;
         this.pointsValue = 20;
+        this.setScale(0.12);
+        this.baseTint = 0xffaa88;
         break;
       case 'tank':
         this.maxHealth = 90;
@@ -40,6 +45,8 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
         this.speed = 40;
         this.damageValue = 25;
         this.pointsValue = 50;
+        this.setScale(0.24);
+        this.baseTint = 0x88aa99;
         break;
       case 'normal':
       default:
@@ -48,18 +55,26 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
         this.speed = 65;
         this.damageValue = 12;
         this.pointsValue = 10;
+        this.setScale(0.15);
+        this.baseTint = 0xffffff;
         break;
     }
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Apply base tint if not default white
+    if (this.baseTint !== 0xffffff) {
+      this.setTint(this.baseTint);
+    }
+
     // Setup bounds sizes
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.setCollideWorldBounds(true);
-      body.setSize(40, 56);
-      body.setOffset(12, 8);
+      // Adjust to match the 500x433 frame resolution
+      body.setSize(180, 320);
+      body.setOffset(160, 60);
     }
 
     // Play default walking animation
@@ -74,13 +89,21 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
       this.hurtTimer -= delta;
       if (this.hurtTimer <= 0) {
         this.isHurt = false;
-        this.setTint(0xffffff);
+        this.setTint(this.baseTint);
       }
       return; // Skip AI pathfinding while knocked back
     }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (!body) return;
+
+    // Handle Attack Animation Cooldown
+    if (this.isAttacking) {
+      this.attackTimer -= delta;
+      if (this.attackTimer <= 0) {
+        this.isAttacking = false;
+      }
+    }
 
     // Dash timers for Fast Zombies
     if (this.zombieType === 'fast') {
@@ -89,7 +112,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
         if (this.dashActiveTimer <= 0) {
           this.isDashing = false;
           this.dashCooldownTimer = 3000;
-          this.setTint(0xffffff);
+          this.setTint(this.baseTint);
         } else {
           this.setVelocity(this.dashVelocityX, this.dashVelocityY);
           this.flipX = this.dashVelocityX < 0;
@@ -109,7 +132,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     if (this.zombieType === 'fast' && !this.isDashing && this.dashCooldownTimer <= 0 && distance < 200 && distance > 30) {
       this.isDashing = true;
       this.dashActiveTimer = 500;
-      this.setTint(0xffaa55); // Orange glow during dash
+      this.setTint(0xff5522); // Brighter dash tint
       if (distance > 0) {
         this.dashVelocityX = (dx / distance) * this.speed * 3.0;
         this.dashVelocityY = (dy / distance) * this.speed * 3.0;
@@ -131,6 +154,18 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.setVelocity(0, 0);
     }
+
+    // Play walk animation if not attacking
+    if (!this.isAttacking && !this.isHurt) {
+      this.play(`zombie-${this.zombieType}-walk`, true);
+    }
+  }
+
+  public playAttack(): void {
+    if (this.isAttacking || this.isHurt || this.health <= 0) return;
+    this.isAttacking = true;
+    this.attackTimer = 600; // Attack animation duration
+    this.play(`zombie-${this.zombieType}-attack`, true);
   }
 
   public takeDamage(amount: number): boolean {
@@ -142,6 +177,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     this.isHurt = true;
     this.hurtTimer = 150;
     this.setTint(0xff5555);
+    this.play(`zombie-${this.zombieType}-hurt`, true);
 
     // Cancel current dash if hurt
     if (this.isDashing) {
@@ -190,8 +226,15 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
 
   private die(): void {
     this.setVelocity(0, 0);
-    this.setActive(false);
-    this.setVisible(false);
+    
+    // Disable physics collisions so it doesn't block player or bullets
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (body) {
+      body.enable = false;
+    }
+
+    // Play death animation
+    this.play(`zombie-${this.zombieType}-die`);
 
     // Final explosion of blood
     const particles = this.scene.add.particles(this.x, this.y, 'particle_blood', {
@@ -209,6 +252,10 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
 
     // Notify scene of zombie death
     this.scene.events.emit('zombie-killed', this);
-    this.destroy();
+    
+    // Destroy sprite after animation completes (800ms)
+    this.scene.time.delayedCall(800, () => {
+      this.destroy();
+    });
   }
 }

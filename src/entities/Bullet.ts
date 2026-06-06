@@ -8,11 +8,17 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Scale the bullet since the sprite frame is 46x46
+    this.setScale(0.35);
+
     // Disable gravity on bullet
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.setAllowGravity(false);
       body.setCollideWorldBounds(false);
+      // Center the body collision box inside the unscaled 46x46 frame
+      body.setSize(20, 20);
+      body.setOffset(13, 13);
     }
   }
 

@@ -604,6 +604,7 @@ export class AssetGenerator {
 
   private static createBulletTexture(scene: Phaser.Scene): void {
     const key = 'bullet';
+    if (scene.textures.exists(key)) return;
     const canvas = scene.textures.createCanvas(key, 8, 8);
     if (!canvas) return;
     const ctx = canvas.getContext();
