@@ -25,7 +25,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
   private baseTint: number = 0xffffff;
 
   constructor(scene: Phaser.Scene, x: number, y: number, type: ZombieType) {
-    super(scene, x, y, 'zombie-walk-0');
+    super(scene, x, y, type === 'fast' ? 'zombiefast-walk-0' : 'zombie-walk-0');
     this.zombieType = type;
 
     // Apply specific stats based on type
@@ -37,7 +37,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
         this.damageValue = 8;
         this.pointsValue = 20;
         this.setScale(0.12);
-        this.baseTint = 0xffaa88;
+        this.baseTint = 0xffffff;
         break;
       case 'tank':
         this.maxHealth = 90;
@@ -72,9 +72,15 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.setCollideWorldBounds(true);
-      // Adjust to match the 500x433 frame resolution
-      body.setSize(180, 320);
-      body.setOffset(160, 60);
+      if (type === 'fast') {
+        // Adjust to match the larger 540x548 frame resolution
+        body.setSize(180, 380);
+        body.setOffset(180, 84);
+      } else {
+        // Adjust to match the 500x433 frame resolution
+        body.setSize(180, 320);
+        body.setOffset(160, 60);
+      }
     }
 
     // Play default walking animation

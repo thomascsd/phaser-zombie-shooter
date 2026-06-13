@@ -56,6 +56,17 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`zombie-die-${i}`, `assets/enemies/Zombie/Die/__Zombie01_Die_00${i}.png`);
     }
 
+    // Preload ZombieFast assets
+    for (let i = 0; i < 10; i++) {
+      this.load.image(`zombiefast-idle-${i}`, `assets/enemies/ZombieFast/Idle/__Zombie01_Idle_00${i}.png`);
+      this.load.image(`zombiefast-walk-${i}`, `assets/enemies/ZombieFast/Walk/__Zombie01_Walk_00${i}.png`);
+    }
+    for (let i = 0; i < 8; i++) {
+      this.load.image(`zombiefast-attack-${i}`, `assets/enemies/ZombieFast/Attack/__Zombie01_Attack_00${i}.png`);
+      this.load.image(`zombiefast-hurt-${i}`, `assets/enemies/ZombieFast/Hurt/__Zombie01_Hurt_00${i}.png`);
+      this.load.image(`zombiefast-die-${i}`, `assets/enemies/ZombieFast/Dead/__Zombie01_Dead_00${i}.png`);
+    }
+
     // Simulate standard progress indicator
     this.load.on('progress', (value: number) => {
       progressBar.clear();
@@ -131,38 +142,47 @@ export class BootScene extends Phaser.Scene {
 
     zombieTypes.forEach(type => {
       const rate = rates[type];
+      const isFast = type === 'fast';
+      const keyPrefix = isFast ? 'zombiefast' : 'zombie';
+      const lengths = {
+        idle: isFast ? 10 : 12,
+        walk: isFast ? 10 : 8,
+        attack: isFast ? 8 : 12,
+        hurt: 8,
+        die: 8
+      };
 
       this.anims.create({
         key: `zombie-${type}-idle`,
-        frames: Array.from({ length: 12 }, (_, i) => ({ key: `zombie-idle-${i}` })),
+        frames: Array.from({ length: lengths.idle }, (_, i) => ({ key: `${keyPrefix}-idle-${i}` })),
         frameRate: rate.idle,
         repeat: -1
       });
 
       this.anims.create({
         key: `zombie-${type}-walk`,
-        frames: Array.from({ length: 8 }, (_, i) => ({ key: `zombie-walk-${i}` })),
+        frames: Array.from({ length: lengths.walk }, (_, i) => ({ key: `${keyPrefix}-walk-${i}` })),
         frameRate: rate.walk,
         repeat: -1
       });
 
       this.anims.create({
         key: `zombie-${type}-attack`,
-        frames: Array.from({ length: 12 }, (_, i) => ({ key: `zombie-attack-${i}` })),
+        frames: Array.from({ length: lengths.attack }, (_, i) => ({ key: `${keyPrefix}-attack-${i}` })),
         frameRate: rate.attack,
         repeat: 0
       });
 
       this.anims.create({
         key: `zombie-${type}-hurt`,
-        frames: Array.from({ length: 8 }, (_, i) => ({ key: `zombie-hurt-${i}` })),
+        frames: Array.from({ length: lengths.hurt }, (_, i) => ({ key: `${keyPrefix}-hurt-${i}` })),
         frameRate: rate.hurt,
         repeat: 0
       });
 
       this.anims.create({
         key: `zombie-${type}-die`,
-        frames: Array.from({ length: 8 }, (_, i) => ({ key: `zombie-die-${i}` })),
+        frames: Array.from({ length: lengths.die }, (_, i) => ({ key: `${keyPrefix}-die-${i}` })),
         frameRate: rate.die,
         repeat: 0
       });
