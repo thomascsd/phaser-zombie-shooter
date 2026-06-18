@@ -33,7 +33,7 @@ export class LevelManager {
       levelNumber: 3,
       targetKills: 25,
       spawnInterval: 500,
-      spawnComposition: { normal: 0.3, fast: 0.4, tank: 0.3 },
+      spawnComposition: { normal: 0.0, fast: 0.6, tank: 0.4 },
       hasMidBoss: false,
       hasFinalBoss: false
     },
@@ -41,7 +41,7 @@ export class LevelManager {
       levelNumber: 4,
       targetKills: 35,
       spawnInterval: 300,
-      spawnComposition: { normal: 0.4, fast: 0.4, tank: 0.2 },
+      spawnComposition: { normal: 0.0, fast: 0.5, tank: 0.5 },
       hasMidBoss: false,
       hasFinalBoss: false
     },
@@ -49,7 +49,7 @@ export class LevelManager {
       levelNumber: 5,
       targetKills: 1, // Killing final boss wins
       spawnInterval: 4000, // spawn few minion adds during boss fight
-      spawnComposition: { normal: 0.5, fast: 0.5, tank: 0.0 },
+      spawnComposition: { normal: 0.0, fast: 0.0, tank: 1.0 },
       hasMidBoss: false,
       hasFinalBoss: true
     }
