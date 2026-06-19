@@ -32,6 +32,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('preload_player_placeholder', 'assets/player.png');
     this.load.image('preload_zombie_placeholder', 'assets/zombie.png');
 
+    // Preload Gameplay Music
+    this.load.audio('gameplay_music', 'assets/music/Stasis.mp3');
+
     // Preload Bullet asset
     this.load.image('bullet', 'assets/characters/Soldier/Bullet.png');
 

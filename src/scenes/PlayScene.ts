@@ -40,6 +40,9 @@ export class PlayScene extends Phaser.Scene {
   // Alerts
   private overlayAlertText!: Phaser.GameObjects.Text;
 
+  // Music
+  private backgroundMusic!: Phaser.Sound.BaseSound;
+
   constructor() {
     super('PlayScene');
   }
@@ -114,6 +117,19 @@ export class PlayScene extends Phaser.Scene {
 
     // 11. Large welcome alert
     this.showAlert('STAGE 1: ZOMBIE WASTELAND', '#3bf1a9');
+
+    // 12. Play gameplay background music
+    this.backgroundMusic = this.sound.add('gameplay_music', {
+      loop: true,
+      volume: 0
+    });
+    this.backgroundMusic.play();
+
+    this.tweens.add({
+      targets: this.backgroundMusic,
+      volume: 0.5,
+      duration: 1000
+    });
   }
 
   public update(time: number, delta: number): void {
@@ -341,7 +357,13 @@ export class PlayScene extends Phaser.Scene {
         this.startLevelSpawning();
       } else {
         // Final boss defeated -> VICTORY
+        this.tweens.add({
+          targets: this.backgroundMusic,
+          volume: 0,
+          duration: 1000
+        });
         this.time.delayedCall(1500, () => {
+          this.backgroundMusic.stop();
           this.scene.start('GameOverScene', {
             isVictory: true,
             score: this.levelManager.totalKillsCount * 100,
@@ -359,8 +381,14 @@ export class PlayScene extends Phaser.Scene {
 
     // Listen to player death
     this.events.on('player-died', () => {
+      this.tweens.add({
+        targets: this.backgroundMusic,
+        volume: 0,
+        duration: 800
+      });
       this.cameras.main.fade(800, 0, 0, 0, false, (_camera: any, progress: number) => {
         if (progress === 1) {
+          this.backgroundMusic.stop();
           this.scene.start('GameOverScene', {
             isVictory: false,
             score: this.levelManager.totalKillsCount * 100,
@@ -373,6 +401,12 @@ export class PlayScene extends Phaser.Scene {
 
     this.events.on('weapon-changed', (weapon: Weapon) => {
       this.showAlert(`WEAPON: ${weapon.name.toUpperCase()}`, '#aa3bff');
+    });
+
+    this.events.once('shutdown', () => {
+      if (this.backgroundMusic) {
+        this.backgroundMusic.stop();
+      }
     });
   }
 

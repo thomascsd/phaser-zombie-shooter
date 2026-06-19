@@ -6,6 +6,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public create(): void {
+    // Stop any active sounds (safeguard)
+    this.sound.stopAll();
+
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
 
