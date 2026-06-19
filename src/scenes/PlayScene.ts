@@ -403,6 +403,21 @@ export class PlayScene extends Phaser.Scene {
       this.showAlert(`WEAPON: ${weapon.name.toUpperCase()}`, '#aa3bff');
     });
 
+    this.events.on('player-shot', (weapon: Weapon) => {
+      let volume = 0.5;
+      let rate = 1.0;
+
+      if (weapon.name === 'Shotgun') {
+        volume = 0.8;
+        rate = 0.75;
+      } else if (weapon.name === 'Machine Gun') {
+        volume = 0.4;
+        rate = 1.2;
+      }
+
+      this.sound.play('gun_fire', { volume, rate });
+    });
+
     this.events.once('shutdown', () => {
       if (this.backgroundMusic) {
         this.backgroundMusic.stop();
