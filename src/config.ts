@@ -27,3 +27,8 @@ export const GameConfig: Phaser.Types.Core.GameConfig = {
   },
   scene: [BootScene, MenuScene, PlayScene, GameOverScene]
 };
+
+export const DevConfig = {
+  enableTestButtons: true // Toggle this to show/hide the level selector buttons
+};
+

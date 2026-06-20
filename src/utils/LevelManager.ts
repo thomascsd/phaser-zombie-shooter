@@ -73,6 +73,18 @@ export class LevelManager {
     this.isBossSpawned = false;
   }
 
+  public setLevel(levelNumber: number): void {
+    this.currentLevelIndex = levelNumber - 1;
+    this.killsCount = 0;
+    this.totalKillsCount = 0;
+    this.isBossActive = false;
+    this.isBossSpawned = false;
+    if (this.currentLevel.hasFinalBoss) {
+      this.isBossActive = true;
+      this.isBossSpawned = true;
+    }
+  }
+
   public registerKill(): boolean {
     this.killsCount++;
     this.totalKillsCount++;

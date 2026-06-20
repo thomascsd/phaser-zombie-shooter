@@ -4,6 +4,7 @@ import { Zombie } from '../entities/Zombie.ts';
 import { Boss } from '../entities/Boss.ts';
 import { Bullet, BossBullet } from '../entities/Bullet.ts';
 import { LevelManager } from '../utils/LevelManager.ts';
+import { DevConfig } from '../config.ts';
 
 export class PlayScene extends Phaser.Scene {
   // Game Entities
@@ -47,10 +48,13 @@ export class PlayScene extends Phaser.Scene {
     super('PlayScene');
   }
 
-  public create(): void {
+  public create(data?: { startLevel?: number }): void {
     // 1. Reset managers
     this.levelManager = new LevelManager();
     this.levelManager.reset();
+    if (data && typeof data.startLevel === 'number') {
+      this.levelManager.setLevel(data.startLevel);
+    }
     this.activeBoss = null;
 
     // 2. Set physics bounds
@@ -116,7 +120,8 @@ export class PlayScene extends Phaser.Scene {
     this.startLevelSpawning();
 
     // 11. Large welcome alert
-    this.showAlert('STAGE 1: ZOMBIE WASTELAND', '#3bf1a9');
+    const levelNum = this.levelManager.currentLevel.levelNumber;
+    this.showLevelStartAlert(levelNum);
 
     // 12. Play gameplay background music
     this.backgroundMusic = this.sound.add('gameplay_music', {
@@ -341,9 +346,15 @@ export class PlayScene extends Phaser.Scene {
       }
 
       // Check if boss spawned or advance wave
+      const oldLevel = this.levelManager.currentLevel.levelNumber;
       const spawnedBoss = this.levelManager.registerKill();
+      const newLevel = this.levelManager.currentLevel.levelNumber;
+
       if (spawnedBoss) {
         this.spawnBossEntity('mid');
+      } else if (newLevel !== oldLevel) {
+        this.startLevelSpawning();
+        this.showLevelStartAlert(newLevel);
       }
     });
 
@@ -549,6 +560,65 @@ export class PlayScene extends Phaser.Scene {
     }).setOrigin(0.5).setVisible(false);
     this.overlayAlertText.setScrollFactor(0);
     this.overlayAlertText.setDepth(100);
+
+    // 6. Test/Debug Level Selector Buttons
+    if (DevConfig.enableTestButtons) {
+      const btnWidth = 36;
+      const btnHeight = 22;
+      const startX = 760;
+      const startY = 15;
+      const spacing = 8;
+
+      for (let i = 0; i < 5; i++) {
+        const x = startX + i * (btnWidth + spacing);
+        const y = startY;
+        const levelNum = i + 1;
+
+        // Background rectangle
+        const bg = this.add.rectangle(x + btnWidth / 2, y + btnHeight / 2, btnWidth, btnHeight, 0xaa3bff)
+          .setScrollFactor(0)
+          .setInteractive({ useHandCursor: true });
+        
+        // Border / outline to make it feel premium
+        const border = this.add.graphics();
+        border.setScrollFactor(0);
+        border.lineStyle(1.5, 0x3bf1a9, 1);
+        border.strokeRect(x, y, btnWidth, btnHeight);
+
+        // Text
+        const txt = this.add.text(x + btnWidth / 2, y + btnHeight / 2, `L${levelNum}`, {
+          font: '8px "Press Start 2P"',
+          color: '#ffffff'
+        }).setOrigin(0.5);
+        txt.setScrollFactor(0);
+
+        hudContainer.add([bg, border, txt]);
+
+        // Interactive events
+        bg.on('pointerover', () => {
+          bg.setFillStyle(0x3bf1a9);
+          txt.setColor('#110e1b');
+        });
+        bg.on('pointerout', () => {
+          bg.setFillStyle(0xaa3bff);
+          txt.setColor('#ffffff');
+        });
+        bg.on('pointerdown', () => {
+          // Disable inputs immediately to prevent shooting or double clicking
+          this.input.enabled = false;
+          // Stop background music and start PlayScene with this level
+          this.tweens.add({
+            targets: this.backgroundMusic,
+            volume: 0,
+            duration: 200
+          });
+          this.time.delayedCall(200, () => {
+            this.backgroundMusic.stop();
+            this.scene.start('PlayScene', { startLevel: levelNum });
+          });
+        });
+      }
+    }
   }
 
   private updateHUDDrawing(): void {
@@ -615,6 +685,18 @@ export class PlayScene extends Phaser.Scene {
     const hpPercent = Phaser.Math.Clamp(current / max, 0, 1);
     this.hudBossBar.fillStyle(0xff3b3b, 1);
     this.hudBossBar.fillRect(202, 30, 396 * hpPercent, 12);
+  }
+
+  private showLevelStartAlert(levelNum: number): void {
+    const levelNames: { [key: number]: string } = {
+      1: 'STAGE 1: ZOMBIE WASTELAND',
+      2: 'STAGE 2: MUTANT ENCOUNTER',
+      3: 'STAGE 3: FAST HORDE',
+      4: 'STAGE 4: TANK WAVES',
+      5: 'STAGE 5: FINAL CRUCIBLE'
+    };
+    const alertColor = levelNum === 5 ? '#ff3b3b' : '#3bf1a9';
+    this.showAlert(levelNames[levelNum] || `STAGE ${levelNum}`, alertColor);
   }
 
   private showAlert(message: string, colorHexStr: string): void {
